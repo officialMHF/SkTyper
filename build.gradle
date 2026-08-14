@@ -1,0 +1,187 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        // Plain FTP, not SFTP, so commons-net rather than JSch.
+        classpath 'commons-net:commons-net:3.11.1'
+    }
+}
+
+plugins {
+    id 'java'
+    id 'org.jetbrains.kotlin.jvm' version '2.2.10'
+}
+
+group = 'me.mhfs.sktyper'
+version = '1.0.0'
+
+ext {
+    typewriterVersion = '0.9.0'
+    skriptVersion = '2.16.1'
+    // Has to match the stdlib Typewriter's plugin loader downloads. See README.
+    kotlinVersion = '2.2.10'
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'papermc-repo'
+        url = 'https://repo.papermc.io/repository/maven-public/'
+    }
+    maven {
+        name = 'skriptlang-repo'
+        url = 'https://repo.skriptlang.org/releases'
+    }
+    maven {
+        name = 'typewriter-repo'
+        url = 'https://maven.typewritermc.com/releases'
+    }
+    maven {
+        name = 'codemc-repo'
+        url = 'https://repo.codemc.io/repository/maven-releases/'
+    }
+}
+
+dependencies {
+    compileOnly 'io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT'
+
+    // The Skript jar has every class we touch; its transitives are dead weight.
+    compileOnly("com.github.SkriptLang:Skript:${skriptVersion}") { transitive = false }
+
+    // transitive = false because engine-paper pulls EntityLib snapshots that public repos don't have.
+    compileOnly("com.typewritermc:engine-paper:${typewriterVersion}") { transitive = false }
+    compileOnly("com.typewritermc:engine-core:${typewriterVersion}") { transitive = false }
+    compileOnly("com.typewritermc:engine-loader:${typewriterVersion}") { transitive = false }
+
+    // Only for KoinJavaComponent, to grab FactDatabase / AudienceManager / ExtensionLoader.
+    compileOnly 'io.insert-koin:koin-core-jvm:4.0.4'
+
+    // AsyncEntityDefinitionInteract has PacketEvents types in its accessors. We never call those,
+    // the compiler just needs to be able to read the class.
+    compileOnly 'com.github.retrooper:packetevents-api:2.9.4'
+
+    // Do NOT turn these into implementation. Shipping a second kotlin-stdlib gives KClass and
+    // friends two Class objects and every Typewriter call dies with a LinkageError. We link
+    // against the engine's copy at runtime instead.
+    compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion}"
+    compileOnly "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}"
+}
+
+tasks.register('uploadJarToFtp') {
+    dependsOn tasks.named('jar')
+    doLast {
+        def host       = project.findProperty('ftpHost')
+        def port       = ((project.findProperty('ftpPort') ?: '21') as String) as int
+        def user       = project.findProperty('ftpUser')
+        def pass       = project.findProperty('ftpPassword')
+        def remotePath = (project.findProperty('ftpRemotePath') ?: 'plugins/SkTyper.jar') as String
+        def jarFile    = tasks.named('jar').get().outputs.files.singleFile
+
+        if (!host || !user || !pass) {
+            throw new GradleException(
+                    "Set ftpHost, ftpUser and ftpPassword in ~/.gradle/gradle.properties before deploying."
+            )
+        }
+
+        def ftp = new org.apache.commons.net.ftp.FTPClient()
+        ftp.setConnectTimeout(15000)
+        ftp.setDefaultTimeout(30000)
+        try {
+            ftp.connect(host as String, port)
+            if (!org.apache.commons.net.ftp.FTPReply.isPositiveCompletion(ftp.getReplyCode())) {
+                throw new GradleException("FTP server refused the connection: ${ftp.getReplyString()}")
+            }
+            if (!ftp.login(user as String, pass as String)) {
+                throw new GradleException("FTP login failed for user '${user}': ${ftp.getReplyString()}")
+            }
+            ftp.setSoTimeout(30000)
+            // Game hosts sit behind NAT, active mode can't dial back to the build machine.
+            ftp.enterLocalPassiveMode()
+            ftp.setFileType(org.apache.commons.net.ftp.FTP.BINARY_FILE_TYPE)
+            ftp.setControlKeepAliveTimeout(java.time.Duration.ofSeconds(30))
+
+            // Walk the remote directory chain, creating anything missing.
+            def segments = remotePath.split('/').findAll { it }
+            if (segments.size() > 1) {
+                def dirs = segments[0..-2]
+                def walked = ''
+                dirs.each { dir ->
+                    walked = walked ? "${walked}/${dir}" : dir
+                    if (!ftp.changeWorkingDirectory(walked)) {
+                        ftp.makeDirectory(walked)
+                    }
+                    ftp.changeWorkingDirectory('/')
+                }
+            }
+
+            def stored = jarFile.withInputStream { input ->
+                ftp.storeFile(remotePath, input)
+            }
+            if (!stored) {
+                throw new GradleException("FTP upload rejected by server: ${ftp.getReplyString()}")
+            }
+            println "Plugin uploaded successfully to ${host}:${port} -> ${remotePath} (${jarFile.length()} bytes)"
+        } catch (GradleException e) {
+            throw e
+        } catch (Exception e) {
+            throw new GradleException("FTP upload failed: ${e.message}", e)
+        } finally {
+            try {
+                if (ftp.isConnected()) {
+                    ftp.logout()
+                    ftp.disconnect()
+                }
+            } catch (Exception ignored) {
+                // Transfer already finished, nothing to salvage.
+            }
+        }
+    }
+}
+
+// gradlew deploy = build + upload.
+tasks.register('deploy') {
+    dependsOn tasks.named('uploadJarToFtp')
+}
+
+def targetJavaVersion = 21
+java {
+    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
+    sourceCompatibility = javaVersion
+    targetCompatibility = javaVersion
+    if (JavaVersion.current() < javaVersion) {
+        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    }
+}
+
+kotlin {
+    jvmToolchain(targetJavaVersion)
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
+        options.release.set(targetJavaVersion)
+    }
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+    }
+}
+
+processResources {
+    def props = [version: version]
+    inputs.properties props
+    filteringCharset 'UTF-8'
+    filesMatching('plugin.yml') {
+        expand props
+    }
+}
+
+tasks.named('jar') {
+    archiveBaseName.set('SkTyper')
+    archiveClassifier.set('')
+    archiveVersion.set('')
+}

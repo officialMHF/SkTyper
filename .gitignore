@@ -1,0 +1,57 @@
+# Build output
+build/
+out/
+target/
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Gradle
+.gradle/
+.kotlin/
+gradle-app.setting
+local.properties
+*.local.properties
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Eclipse
+.classpath
+.project
+.settings/
+.apt_generated/
+.factorypath
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# VS Code
+.vscode/
+
+# Editor / assistant tooling
+.claude/
+.cursor/
+.aider*
+.continue/
+.windsurf/
+CLAUDE.md
+AGENTS.md
+.github/copilot-instructions.md
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local test server
+run/
+server/
+logs/
+*.log
