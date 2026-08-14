@@ -1,0 +1,141 @@
+#
+# SkTyper showcase - drop into plugins/Skript/scripts/ to try the syntax out.
+# Entry and page names below are placeholders; swap them for ids from your own Typewriter panel.
+#
+
+on load:
+    if typewriter is not loaded:
+        send "SkTyper: Typewriter is missing" to console
+        stop
+    send "SkTyper running against Typewriter %the typewriter version%" to console
+    send "%size of all typewriter entries% entries across %size of all typewriter pages% pages" to console
+
+# ---------------------------------------------------------------------------------------------- #
+# Triggering entries and reading facts
+# ---------------------------------------------------------------------------------------------- #
+
+on join:
+    if typewriter fact "tutorial_done" of player is 0:
+        trigger typewriter entry "tutorial_start" for player
+
+command /talk <text>:
+    trigger:
+        if typewriter entry arg-1 does not exist:
+            send "<red>No such Typewriter entry."
+            stop
+        trigger typewriter entry arg-1 for player
+
+command /fact <text> <number>:
+    permission: sktyper.admin
+    trigger:
+        set typewriter fact arg-1 of player to arg-2
+        send "Fact %arg-1% is now %typewriter fact arg-1 of player%"
+
+command /coin:
+    trigger:
+        add 1 to typewriter fact "coins_collected" of player
+        send "Coins: %typewriter fact "coins_collected" of player%"
+
+# ---------------------------------------------------------------------------------------------- #
+# Dialogue
+# ---------------------------------------------------------------------------------------------- #
+
+on typewriter dialogue start:
+    send action bar "&7Sneak to skip" to event-player
+
+on typewriter dialogue switch:
+    set {_line} to the current typewriter dialogue of event-player
+    send "Now showing %the typewriter name of {_line}%" to console
+
+on typewriter dialogue end:
+    send "You spoke with %the typewriter dialogue speakers of event-player%" to event-player
+
+on sneak toggle:
+    if player is in a typewriter dialogue:
+        continue the typewriter dialogue for player
+
+# ---------------------------------------------------------------------------------------------- #
+# Cinematics
+# ---------------------------------------------------------------------------------------------- #
+
+command /cutscene:
+    trigger:
+        if player is playing a typewriter cinematic:
+            send "<red>You are already watching one."
+            stop
+        start typewriter cinematic "intro_cutscene" for player
+
+on typewriter cinematic start:
+    send "Playing %event-string%" to console
+
+on typewriter cinematic end:
+    if event-string is "intro_cutscene":
+        give 1 diamond to event-player
+        send "Thanks for watching (%event-number% frames)" to event-player
+
+on damage:
+    # Do not let anything interrupt a cutscene.
+    if victim is a player:
+        if victim is playing a typewriter cinematic:
+            cancel event
+
+# ---------------------------------------------------------------------------------------------- #
+# NPCs and audiences
+# ---------------------------------------------------------------------------------------------- #
+
+on typewriter entity interact:
+    set {_npc} to the typewriter display name of event-typewriter entry for event-player
+    send "You clicked %{_npc}%" to event-player
+    if the typewriter name of the interacted typewriter entity instance is "town_guard_gate":
+        trigger typewriter entry "guard_greeting" for event-player
+
+command /audience <text>:
+    permission: sktyper.admin
+    trigger:
+        if player is in the typewriter audience of arg-1:
+            remove player from the typewriter audience of arg-1
+            send "Removed you from %arg-1%"
+        else:
+            add player to the typewriter audience of arg-1
+            send "Added you to %arg-1%"
+
+# ---------------------------------------------------------------------------------------------- #
+# Quests (needs Typewriter's Quest extension)
+# ---------------------------------------------------------------------------------------------- #
+
+command /quests:
+    trigger:
+        if typewriter quests are not available:
+            send "<red>The Quest extension is not installed."
+            stop
+        send "&6In progress:"
+        loop the active typewriter quests of player:
+            send " &7- %the typewriter quest display of loop-value for player%"
+        send "&aCompleted:"
+        loop the completed typewriter quests of player:
+            send " &7- %the typewriter quest display of loop-value for player%"
+
+command /track <text>:
+    trigger:
+        set the tracked typewriter quest of player to typewriter entry arg-1
+        send "Now tracking %the typewriter quest display of the tracked typewriter quest of player for player%"
+
+on typewriter quest status change:
+    if event-string is "completed":
+        send title "&6Quest complete" with subtitle "%the typewriter quest display of event-typewriter entry for event-player%" to event-player
+    else if event-string is "active":
+        send "&eNew quest: %the typewriter quest display of event-typewriter entry for event-player%" to event-player
+
+on typewriter tracked quest change:
+    if event-typewriter entry is set:
+        send action bar "&7Tracking: %the typewriter quest display of event-typewriter entry for event-player%" to event-player
+
+# ---------------------------------------------------------------------------------------------- #
+# Engine lifecycle
+# ---------------------------------------------------------------------------------------------- #
+
+on typewriter staging change:
+    send "Typewriter staging state: %event-string%" to console
+
+on typewriter unload:
+    send "Typewriter is reloading" to console
