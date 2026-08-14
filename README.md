@@ -431,6 +431,7 @@ uses, so anything created this way shows up in the panel and can be edited there
 (create|spawn) [a] [new] typewriter (entity|npc) [instance] [named] %string% of [definition] %entry% at %location% [on page %string%]
 publish [the] typewriter (pages|changes)
 delete [the] typewriter page[s] %strings%
+(remove|delete) [the] typewriter (entity|npc) [instance] [named] %strings%
 ```
 
 ### Cinematics from a list of points
@@ -470,6 +471,14 @@ add player to the typewriter audience of "gate_guard"
 This places an instance of an entity definition that **already exists**. Definitions carry the skin,
 entity data and activities, which are far easier to build once in the panel than to describe from a
 script. Instances land on a manifest page called `sktyper_entities` unless you pass `on page "..."`.
+
+Removing one goes by name, not by location, since an instance lives on a page rather than in the
+world:
+
+```applescript
+remove typewriter entity "gate_guard"
+publish typewriter pages
+```
 
 Needs Typewriter's Entity extension.
 

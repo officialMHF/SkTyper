@@ -37,6 +37,27 @@ object Authoring {
     fun pageExists(id: String): Boolean =
         runCatching { staging()?.pages?.containsKey(id) == true }.getOrElse { false }
 
+    /**
+     * Removes a staged entry by its name or id, wherever it lives.
+     *
+     * Page ids and page names can differ, so this walks staging itself rather than going through
+     * findEntryPage, which answers with the name.
+     */
+    fun deleteEntry(nameOrId: String): Boolean {
+        val manager = staging() ?: return false
+        val pages = runCatching { manager.pages }.getOrNull() ?: return false
+        for ((pageId, page) in pages) {
+            val entries = runCatching { page.getAsJsonArray("entries") }.getOrNull() ?: continue
+            val match = entries.firstOrNull { element ->
+                val entry = runCatching { element.asJsonObject }.getOrNull() ?: return@firstOrNull false
+                entry.get("id")?.asString == nameOrId || entry.get("name")?.asString == nameOrId
+            } ?: continue
+            val entryId = match.asJsonObject.get("id")?.asString ?: continue
+            return runCatching { manager.deleteEntry(pageId, entryId).isSuccess }.getOrElse { false }
+        }
+        return false
+    }
+
     fun deletePage(id: String): Boolean {
         val manager = staging() ?: return false
         return runCatching { manager.deletePage(id).isSuccess }.getOrElse { false }

@@ -213,3 +213,41 @@ class EffDeletePage : Effect() {
     override fun toString(event: Event?, debug: Boolean): String =
         "delete typewriter page ${page.toString(event, debug)}"
 }
+
+@Name("Delete Typewriter Entry")
+@Description(
+    "Removes a staged entry - an entity instance, a cinematic entry, anything - by its name or id.",
+    "Takes effect on the next publish.",
+)
+@Examples(
+    "remove typewriter entity \"gate_guard\"",
+    "publish typewriter pages",
+)
+@RequiredPlugins("Typewriter")
+@Since("1.0.2")
+class EffDeleteEntry : Effect() {
+
+    private lateinit var names: Expression<String>
+
+    @Suppress("UNCHECKED_CAST")
+    override fun init(
+        exprs: Array<out Expression<*>>,
+        matchedPattern: Int,
+        isDelayed: Kleenean,
+        parseResult: ParseResult,
+    ): Boolean {
+        names = exprs[0] as Expression<String>
+        return true
+    }
+
+    override fun execute(event: Event) {
+        names.getArray(event).forEach { name ->
+            if (!Authoring.deleteEntry(name)) {
+                SkTyper.instance.logger.warning("remove typewriter entity: nothing staged called \"$name\"")
+            }
+        }
+    }
+
+    override fun toString(event: Event?, debug: Boolean): String =
+        "remove typewriter entity ${names.toString(event, debug)}"
+}

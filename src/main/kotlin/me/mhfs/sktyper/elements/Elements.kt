@@ -20,6 +20,7 @@ import me.mhfs.sktyper.elements.conditions.CondTypewriterLoaded
 import me.mhfs.sktyper.elements.effects.EffAudience
 import me.mhfs.sktyper.elements.effects.EffCreateCinematic
 import me.mhfs.sktyper.elements.effects.EffCreateEntity
+import me.mhfs.sktyper.elements.effects.EffDeleteEntry
 import me.mhfs.sktyper.elements.effects.EffDeletePage
 import me.mhfs.sktyper.elements.effects.EffPublishPages
 import me.mhfs.sktyper.elements.effects.EffEndInteraction
@@ -227,7 +228,7 @@ object Elements {
         Skript.registerEffect(
             EffCreateEntity::class.java,
             "(create|spawn) [a] [new] typewriter (entity|npc) [instance] [named] %string% " +
-                "of [definition] $ENTRY at %location% [on [page] %-string%]",
+                "of [(definition|type|kind)] $ENTRY at %location% [on [page] %-string%]",
         )
         Skript.registerEffect(
             EffPublishPages::class.java,
@@ -236,6 +237,11 @@ object Elements {
         Skript.registerEffect(
             EffDeletePage::class.java,
             "delete [the] typewriter page[s] %strings%",
+        )
+        Skript.registerEffect(
+            EffDeleteEntry::class.java,
+            "(remove|delete) [the] typewriter (entity|npc) [instance] [named] %strings%",
+            "(remove|delete) [the] typewriter entr(y|ies) [named] %strings% from [the] page[s]",
         )
     }
 
