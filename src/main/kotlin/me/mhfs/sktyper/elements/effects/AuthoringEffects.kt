@@ -20,6 +20,20 @@ import org.bukkit.Location
 import org.bukkit.entity.Player
 import org.bukkit.event.Event
 
+private fun eventPlayer(event: Event): Player? = runCatching {
+    EventValues.getEventValue(event, Player::class.java, EventValues.TIME_NOW)
+}.getOrNull()
+
+/**
+ * Authoring fails for mundane reasons - a duplicate name, too few points, a missing definition.
+ * Whoever ran the effect is the one who can fix it, so they hear about it as well as the console.
+ */
+private fun report(event: Event, message: String) {
+    SkTyper.instance.logger.warning(message)
+    val player = eventPlayer(event) ?: return
+    if (player.isOnline) player.sendMessage("<red>$message")
+}
+
 @Name("Create Typewriter Cinematic")
 @Description(
     "Builds a cinematic page with a camera path running through the given locations.",
@@ -65,7 +79,7 @@ class EffCreateCinematic : Effect() {
         val name = this.name.getSingle(event) ?: return
         val points = this.points.getArray(event).toList()
         if (points.size < 2) {
-            warn("needs at least two points, got ${points.size}")
+            warn(event, "needs at least two points, got ${points.size}")
             return
         }
 
@@ -76,12 +90,12 @@ class EffCreateCinematic : Effect() {
         }
         val page = Authoring.createCameraCinematic(name, points, ticks)
         if (page == null) {
-            warn("could not create \"$name\" - the page may already exist, or Typewriter refused the write")
+            warn(event, "could not create \"$name\" - the page may already exist, or Typewriter refused the write")
         }
     }
 
-    private fun warn(message: String) {
-        SkTyper.instance.logger.warning("create typewriter cinematic: $message")
+    private fun warn(event: Event, message: String) {
+        report(event, "create typewriter cinematic: $message")
     }
 
     override fun toString(event: Event?, debug: Boolean): String =
@@ -131,7 +145,7 @@ class EffCreateEntity : Effect() {
         val raw = definition.getSingle(event)
         val definitionId = Tw.resolve(raw)?.id ?: (raw as? String)
         if (definitionId.isNullOrBlank()) {
-            SkTyper.instance.logger.warning("create typewriter entity: no definition given for \"$name\"")
+            report(event, "create typewriter entity: no definition given for \"$name\"")
             return
         }
 
@@ -144,7 +158,7 @@ class EffCreateEntity : Effect() {
             "shared_advanced_entity_instance",
         )
         if (created == null) {
-            SkTyper.instance.logger.warning("create typewriter entity: could not create \"$name\"")
+            report(event, "create typewriter entity: could not create \"$name\"")
         }
     }
 
@@ -177,9 +191,7 @@ class EffPublishPages : Effect() {
     ): Boolean = true
 
     override fun execute(event: Event) {
-        val player = runCatching {
-            EventValues.getEventValue(event, Player::class.java, EventValues.TIME_NOW)
-        }.getOrNull()
+        val player = eventPlayer(event)
 
         Authoring.publish { ok, message ->
             val text = if (ok) "Typewriter pages published." else "Typewriter publish failed: $message"
@@ -252,7 +264,7 @@ class EffDeleteEntry : Effect() {
     override fun execute(event: Event) {
         names.getArray(event).forEach { name ->
             if (!Authoring.deleteEntry(name)) {
-                SkTyper.instance.logger.warning("remove typewriter entity: nothing staged called \"$name\"")
+                report(event, "remove typewriter entity: nothing staged called \"$name\"")
             }
         }
     }

@@ -430,7 +430,7 @@ uses, so anything created this way shows up in the panel and can be edited there
 (create|record) [a] [new] typewriter cinematic [page] [named] %string% (along|from|through) %locations% [over %timespan/number% [seconds|ticks]]
 (create|spawn) [a] [new] typewriter (entity|npc) [instance] [named] %string% of [definition] %entry% at %location% [on page %string%]
 publish [the] typewriter (pages|changes)
-delete [the] typewriter page[s] %strings%
+delete [the] typewriter (page|cinematic)[s] %strings%
 (remove|delete) [the] typewriter (entity|npc) [instance] [named] %strings%
 ```
 

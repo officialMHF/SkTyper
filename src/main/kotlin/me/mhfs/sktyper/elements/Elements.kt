@@ -237,7 +237,7 @@ object Elements {
         )
         Skript.registerEffect(
             EffDeletePage::class.java,
-            "delete [the] typewriter page[s] %strings%",
+            "delete [the] typewriter (page|cinematic)[s] %strings%",
         )
         Skript.registerEffect(
             EffDeleteEntry::class.java,

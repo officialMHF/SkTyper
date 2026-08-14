@@ -70,10 +70,14 @@ object Authoring {
             return
         }
         Dispatchers.UntickedAsync.launch {
-            val result = runCatching { manager.publish() }
-            val ok = result.getOrNull()?.isSuccess == true
-            val message = result.getOrNull()?.getOrNull()
-                ?: result.exceptionOrNull()?.message
+            val call = runCatching { manager.publish() }
+            val published = call.getOrNull()
+            val ok = published?.isSuccess == true
+            // The reason lives on the Result that publish returned, not on the runCatching around
+            // the call. Reading the wrong one turns "Can only publish when in staging" into noise.
+            val message = published?.getOrNull()
+                ?: published?.exceptionOrNull()?.message
+                ?: call.exceptionOrNull()?.message
                 ?: "Publish failed"
             onDone(ok, message)
         }
