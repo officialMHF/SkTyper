@@ -432,6 +432,21 @@ uses, so anything created this way shows up in the panel and can be edited there
 publish [the] typewriter (pages|changes)
 delete [the] typewriter (page|cinematic)[s] %strings%
 (remove|delete) [the] typewriter (entity|npc) [instance] [named] %strings%
+
+(create|make) [a] [new] typewriter definition [named] %string% with skin [of] %string% [display name %string%] [on page %string%]
+set [the] typewriter skin of %string% to %string%
+set [the] typewriter display name of %string% to %string%
+teleport [the] typewriter (entity|npc) %string% to %location%
+set [the] typewriter activity of %string% to patrol (along|through|between) %locations%
+(create|make) [a] [new] typewriter (entity|npc) cinematic [named] %string% (for|of) %entry% (along|through) %locations% [over %timespan/number%]
+```
+
+Two read-only expressions come with them:
+
+```applescript
+all typewriter entities        # placed NPC instances
+all typewriter definitions     # what those instances are made of
+[the] typewriter spawn [location] of %entries%
 ```
 
 ### Cinematics from a list of points
@@ -471,6 +486,57 @@ create typewriter cinematic "c" along {shot::*} over 400 ticks
 Reach for the number form whenever the length comes from a variable. Skript only builds a timespan
 out of literal text, so `over {_duration} seconds` is not a timespan at all — it is a number followed
 by the word seconds, and this syntax reads it that way.
+
+### NPC definitions and skins
+
+A definition is what an NPC *is* — skin, display name, data. An instance is where one stands.
+
+```applescript
+create typewriter definition "guard" with skin of "Notch" display name "&cTown Guard"
+publish typewriter pages
+create typewriter entity "gate_guard" of type "guard" at location of player
+publish typewriter pages
+```
+
+The skin is resolved from Mojang: the name gives a uuid, the uuid gives the signed textures Typewriter
+stores. That's two network calls, so the definition lands a moment after the effect returns rather
+than immediately — wait a few ticks before publishing. Results are reported either way, and lookups
+are cached for the session.
+
+`set typewriter skin of "guard" to "jeb_"` swaps it later, and
+`set typewriter display name of "guard" to "..."` renames it.
+
+### Moving NPCs around
+
+```applescript
+teleport typewriter entity "gate_guard" to location of player
+send "%the typewriter spawn of \"gate_guard\"%"
+```
+
+Teleporting rewrites the instance's spawn point, so it is a permanent move rather than a walk. The
+spawn expression reads staging, so it reflects the change straight away without a publish.
+
+To make an NPC walk a route:
+
+```applescript
+set typewriter activity of "gate_guard" to patrol along {route::*}
+publish typewriter pages
+```
+
+Typewriter walks NPCs along a **road network** rather than raw coordinates, so this builds the
+network from your points, chains the nodes in order, wires up a patrol activity and points the NPC at
+it. The route loops back to the first point.
+
+### Entity cinematics
+
+```applescript
+create typewriter entity cinematic "guard_walk" for "guard" along {path::*} over 10 seconds
+publish typewriter pages
+start typewriter cinematic "guard_walk" for player
+```
+
+Typewriter normally records these in game with its own recorder, storing the result as a tape of
+frames. This writes that tape directly, spreading your points evenly across the frame range.
 
 ### Entity instances
 

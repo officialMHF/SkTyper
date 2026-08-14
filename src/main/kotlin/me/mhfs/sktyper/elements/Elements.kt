@@ -19,6 +19,12 @@ import me.mhfs.sktyper.elements.conditions.CondQuestTracked
 import me.mhfs.sktyper.elements.conditions.CondTypewriterLoaded
 import me.mhfs.sktyper.elements.effects.EffAudience
 import me.mhfs.sktyper.elements.effects.EffCreateCinematic
+import me.mhfs.sktyper.elements.effects.EffCreateDefinition
+import me.mhfs.sktyper.elements.effects.EffCreateEntityCinematic
+import me.mhfs.sktyper.elements.effects.EffSetActivity
+import me.mhfs.sktyper.elements.effects.EffSetDisplayName
+import me.mhfs.sktyper.elements.effects.EffSetSkin
+import me.mhfs.sktyper.elements.effects.EffTeleportEntity
 import me.mhfs.sktyper.elements.effects.EffCreateEntity
 import me.mhfs.sktyper.elements.effects.EffDeleteEntry
 import me.mhfs.sktyper.elements.effects.EffDeletePage
@@ -30,7 +36,9 @@ import me.mhfs.sktyper.elements.effects.EffStartCinematic
 import me.mhfs.sktyper.elements.effects.EffStopCinematic
 import me.mhfs.sktyper.elements.effects.EffTrackQuest
 import me.mhfs.sktyper.elements.effects.EffTriggerEntry
+import me.mhfs.sktyper.elements.expressions.ExprAllEntities
 import me.mhfs.sktyper.elements.expressions.ExprAllEntries
+import me.mhfs.sktyper.elements.expressions.ExprSpawn
 import me.mhfs.sktyper.elements.expressions.ExprAllPages
 import me.mhfs.sktyper.elements.expressions.ExprAudience
 import me.mhfs.sktyper.elements.expressions.ExprCinematicFrame
@@ -55,6 +63,7 @@ import me.mhfs.sktyper.elements.expressions.ExprQuestStatus
 import me.mhfs.sktyper.elements.expressions.ExprQuests
 import me.mhfs.sktyper.elements.expressions.ExprTrackedQuest
 import me.mhfs.sktyper.elements.expressions.ExprTypewriterVersion
+import org.bukkit.Location
 import org.bukkit.entity.Player
 
 /** Every pattern SkTyper adds to Skript, in one place. */
@@ -90,6 +99,16 @@ object Elements {
         Skript.registerExpression(
             ExprTypewriterVersion::class.java, String::class.java, ExpressionType.SIMPLE,
             "[the] typewriter version",
+        )
+        // Pattern order matters: ExprAllEntities reads instances vs definitions off the match.
+        Skript.registerExpression(
+            ExprAllEntities::class.java, Entry::class.java, ExpressionType.SIMPLE,
+            "[all [[of] the]] typewriter (entities|npcs)",
+            "[all [[of] the]] typewriter definitions",
+        )
+        Skript.registerExpression(
+            ExprSpawn::class.java, Location::class.java, ExpressionType.PROPERTY,
+            "[the] typewriter spawn [(location|point)] of $ENTRIES",
         )
 
         PropertyExpression.register(
@@ -238,6 +257,33 @@ object Elements {
         Skript.registerEffect(
             EffDeletePage::class.java,
             "delete [the] typewriter (page|cinematic)[s] %strings%",
+        )
+        Skript.registerEffect(
+            EffCreateDefinition::class.java,
+            "(create|make) [a] [new] typewriter (definition|npc definition) [named] %string% " +
+                "with skin [of] %string% [display name %-string%] [on [page] %-string%]",
+        )
+        Skript.registerEffect(
+            EffSetSkin::class.java,
+            "set [the] typewriter skin of %string% to %string%",
+        )
+        Skript.registerEffect(
+            EffSetDisplayName::class.java,
+            "set [the] typewriter display name of %string% to %string%",
+        )
+        Skript.registerEffect(
+            EffTeleportEntity::class.java,
+            "teleport [the] typewriter (entity|npc) %string% to %location%",
+        )
+        Skript.registerEffect(
+            EffSetActivity::class.java,
+            "set [the] typewriter activity of %string% to patrol (along|through|between) %locations%",
+        )
+        Skript.registerEffect(
+            EffCreateEntityCinematic::class.java,
+            "(create|make) [a] [new] typewriter (entity|npc) cinematic [named] %string% " +
+                "(for|of|with) $ENTRY (along|from|through) %locations% " +
+                "[(over|lasting) %-timespan/number% [(second[s]|:tick[s])]]",
         )
         Skript.registerEffect(
             EffDeleteEntry::class.java,

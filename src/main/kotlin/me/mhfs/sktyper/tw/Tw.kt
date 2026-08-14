@@ -12,6 +12,8 @@ import com.typewritermc.engine.paper.entry.Criteria
 import com.typewritermc.engine.paper.entry.TriggerableEntry
 import com.typewritermc.engine.paper.entry.entries.AudienceEntry
 import com.typewritermc.engine.paper.entry.entries.CinematicEntry
+import com.typewritermc.engine.paper.entry.entries.EntityDefinitionEntry
+import com.typewritermc.engine.paper.entry.entries.EntityInstanceEntry
 import com.typewritermc.engine.paper.entry.entries.InteractionEndTrigger
 import com.typewritermc.engine.paper.entry.entries.ReadableFactEntry
 import com.typewritermc.engine.paper.entry.entries.SpeakerEntry
@@ -72,6 +74,12 @@ object Tw {
     fun allEntries(): List<Entry> = runCatching { Query.find(Entry::class).toList() }.getOrElse { emptyList() }
 
     fun displayString(entry: Entry): String = entry.formattedName
+
+    fun allInstances(): List<Entry> =
+        runCatching { Query.find(EntityInstanceEntry::class).toList() }.getOrElse { emptyList() }
+
+    fun allDefinitions(): List<Entry> =
+        runCatching { Query.find(EntityDefinitionEntry::class).toList() }.getOrElse { emptyList() }
 
     fun pageOf(entry: Entry): Page? = allPages().firstOrNull { page -> page.entries.any { it.id == entry.id } }
 

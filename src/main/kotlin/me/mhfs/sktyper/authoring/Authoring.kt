@@ -4,6 +4,9 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.typewritermc.core.utils.UntickedAsync
 import com.typewritermc.core.utils.launch
+import com.google.gson.JsonElement
+import com.google.gson.JsonPrimitive
+import com.typewritermc.engine.paper.entry.AssetStorage
 import com.typewritermc.engine.paper.entry.StagingManager
 import com.typewritermc.engine.paper.entry.StagingState
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +59,229 @@ object Authoring {
             return runCatching { manager.deleteEntry(pageId, entryId).isSuccess }.getOrElse { false }
         }
         return false
+    }
+
+    /** Locates a staged entry by name or id, with the page it sits on. */
+    private fun locate(nameOrId: String): Pair<String, String>? {
+        val pages = runCatching { staging()?.pages }.getOrNull() ?: return null
+        for ((pageId, page) in pages) {
+            val entries = runCatching { page.getAsJsonArray("entries") }.getOrNull() ?: continue
+            for (element in entries) {
+                val entry = runCatching { element.asJsonObject }.getOrNull() ?: continue
+                val id = entry.get("id")?.asString ?: continue
+                if (id == nameOrId || entry.get("name")?.asString == nameOrId) return pageId to id
+            }
+        }
+        return null
+    }
+
+    /** Reads a staged instance's spawn point, so a teleport shows up without waiting for a publish. */
+    fun spawnOf(nameOrId: String): Location? {
+        val pages = runCatching { staging()?.pages }.getOrNull() ?: return null
+        for ((_, page) in pages) {
+            val entries = runCatching { page.getAsJsonArray("entries") }.getOrNull() ?: continue
+            for (element in entries) {
+                val entry = runCatching { element.asJsonObject }.getOrNull() ?: continue
+                val id = entry.get("id")?.asString ?: continue
+                if (id != nameOrId && entry.get("name")?.asString != nameOrId) continue
+                val spawn = entry.getAsJsonObject("spawnLocation") ?: return null
+                val world = runCatching {
+                    org.bukkit.Bukkit.getWorld(java.util.UUID.fromString(spawn.get("world").asString))
+                }.getOrNull() ?: return null
+                return Location(
+                    world,
+                    spawn.get("x")?.asDouble ?: 0.0,
+                    spawn.get("y")?.asDouble ?: 0.0,
+                    spawn.get("z")?.asDouble ?: 0.0,
+                    spawn.get("yaw")?.asFloat ?: 0f,
+                    spawn.get("pitch")?.asFloat ?: 0f,
+                )
+            }
+        }
+        return null
+    }
+
+    fun updateField(nameOrId: String, path: String, value: JsonElement): Boolean {
+        val manager = staging() ?: return false
+        val (pageId, entryId) = locate(nameOrId) ?: return false
+        return runCatching { manager.updateEntryField(pageId, entryId, path, value).isSuccess }
+            .getOrElse { false }
+    }
+
+    fun teleport(nameOrId: String, location: Location): Boolean =
+        updateField(nameOrId, "spawnLocation", position(location))
+
+    fun setSkin(nameOrId: String, texture: String, signature: String): Boolean =
+        updateField(nameOrId, "skin", skinJson(texture, signature))
+
+    fun setDisplayName(nameOrId: String, display: String): Boolean =
+        updateField(nameOrId, "displayName", JsonPrimitive(display))
+
+    fun setActivity(nameOrId: String, activityEntryId: String): Boolean =
+        updateField(nameOrId, "activity", JsonPrimitive(activityEntryId))
+
+    /** Writes an artifact payload to disk; the entry owning it need not be published yet. */
+    private fun storeArtifact(artifactId: String, json: String): Boolean {
+        val storage = runCatching { KoinJavaComponent.get<AssetStorage>(AssetStorage::class.java) }
+            .getOrNull() ?: return false
+        return runCatching {
+            Dispatchers.UntickedAsync.launch {
+                runCatching { storage.storeStringAsset("artifacts/$artifactId.json", json) }
+            }
+        }.isSuccess
+    }
+
+    /** Creates an NPC definition. Texture and signature come from a Mojang profile lookup. */
+    fun createNpcDefinition(
+        name: String,
+        displayName: String,
+        texture: String,
+        signature: String,
+        pageName: String,
+    ): String? {
+        if (!Tw.isAvailable) return null
+        val pageId = slug(pageName) ?: return null
+        if (!createPage(pageId, pageName, MANIFEST_PAGE)) return null
+
+        val id = entryId()
+        val entry = JsonObject().apply {
+            addProperty("id", id)
+            addProperty("blueprintId", "npc_definition")
+            addProperty("name", name)
+            addProperty("displayName", displayName)
+            add("sound", emptySound())
+            add("skin", skinJson(texture, signature))
+            add("data", JsonArray())
+        }
+        return if (createEntry(pageId, entry)) id else null
+    }
+
+    /**
+     * Builds a road network through the given points and a patrol activity that walks it.
+     *
+     * Patrol activities navigate a road network rather than raw locations, so the network has to
+     * exist first. Nodes are chained in order and the walk loops back to the start.
+     */
+    fun createPatrolActivity(name: String, points: List<Location>, pageName: String): String? {
+        if (points.size < 2) return null
+        if (!Tw.isAvailable) return null
+        val pageId = slug(pageName) ?: return null
+        if (!createPage(pageId, pageName, MANIFEST_PAGE)) return null
+
+        val nodes = JsonArray()
+        val edges = JsonArray()
+        points.forEachIndexed { index, point ->
+            nodes.add(JsonObject().apply {
+                add("id", JsonObject().apply { addProperty("id", index) })
+                add("location", position(point))
+                addProperty("radius", 1.0)
+            })
+            val next = (index + 1) % points.size
+            val weight = runCatching { point.distance(points[next]) }.getOrElse { 1.0 }
+            edges.add(JsonObject().apply {
+                add("start", JsonObject().apply { addProperty("id", index) })
+                add("end", JsonObject().apply { addProperty("id", next) })
+                addProperty("weight", if (weight.isFinite()) weight else 1.0)
+            })
+        }
+
+        val artifactId = entryId()
+        val network = JsonObject().apply {
+            add("nodes", nodes)
+            add("edges", edges)
+            add("modifications", JsonArray())
+            add("negativeNodes", JsonArray())
+        }
+        if (!storeArtifact(artifactId, network.toString())) return null
+
+        val networkId = entryId()
+        val networkEntry = JsonObject().apply {
+            addProperty("id", networkId)
+            addProperty("blueprintId", "base_road_network")
+            addProperty("name", name + "_network")
+            addProperty("artifactId", artifactId)
+        }
+        if (!createEntry(pageId, networkEntry)) return null
+
+        val activityId = entryId()
+        val activity = JsonObject().apply {
+            addProperty("id", activityId)
+            addProperty("blueprintId", "patrol_activity")
+            addProperty("name", name + "_patrol")
+            addProperty("roadNetwork", networkId)
+            add("nodes", JsonArray().apply {
+                points.indices.forEach { index ->
+                    add(JsonObject().apply { addProperty("id", index) })
+                }
+            })
+        }
+        return if (createEntry(pageId, activity)) activityId else null
+    }
+
+    /**
+     * Creates an entity cinematic that walks a definition along the given points.
+     *
+     * Typewriter records these in game and stores them as a tape of frames, so a path can be laid
+     * down by spreading the points evenly across the frame range and writing the tape directly.
+     */
+    fun createEntityCinematic(
+        name: String,
+        definitionId: String,
+        points: List<Location>,
+        frames: Int,
+    ): String? {
+        if (points.size < 2) return null
+        if (!Tw.isAvailable) return null
+        if (definitionId.isBlank()) return null
+
+        val pageId = slug(name) ?: return null
+        if (pageExists(pageId)) return null
+        if (!createPage(pageId, name, CINEMATIC_PAGE)) return null
+
+        val total = frames.coerceAtLeast(10)
+        val step = total.toDouble() / (points.size - 1).toDouble()
+        val tape = JsonObject()
+        points.forEachIndexed { index, point ->
+            val frame = (index * step).toInt().coerceIn(0, total)
+            tape.add(frame.toString(), JsonObject().apply { add("location", coordinate(point)) })
+        }
+
+        val artifactId = entryId()
+        val payload = JsonObject().apply { add("default", tape) }
+        if (!storeArtifact(artifactId, payload.toString())) return null
+
+        val artifactEntryId = entryId()
+        val artifactEntry = JsonObject().apply {
+            addProperty("id", artifactEntryId)
+            addProperty("blueprintId", "entity_cinematic_artifact")
+            addProperty("name", name + "_artifact")
+            addProperty("artifactId", artifactId)
+        }
+        if (!createEntry(pageId, artifactEntry)) {
+            deletePage(pageId)
+            return null
+        }
+
+        val id = entryId()
+        val entry = JsonObject().apply {
+            addProperty("id", id)
+            addProperty("blueprintId", "entity_cinematic")
+            addProperty("name", name + "_entity")
+            add("criteria", JsonArray())
+            addProperty("definition", definitionId)
+            add("segments", JsonArray().apply {
+                add(JsonObject().apply {
+                    addProperty("startFrame", 0)
+                    addProperty("endFrame", total)
+                    addProperty("artifact", artifactEntryId)
+                })
+            })
+        }
+        if (!createEntry(pageId, entry)) {
+            deletePage(pageId)
+            return null
+        }
+        return pageId
     }
 
     fun deletePage(id: String): Boolean {
@@ -113,6 +339,33 @@ object Authoring {
         addProperty("pitch", location.pitch)
     }
 
+    private fun coordinate(location: Location): JsonObject = JsonObject().apply {
+        addProperty("x", location.x)
+        addProperty("y", location.y)
+        addProperty("z", location.z)
+        addProperty("yaw", location.yaw)
+        addProperty("pitch", location.pitch)
+    }
+
+    private fun emptySound(): JsonObject = JsonObject().apply {
+        add("soundId", JsonObject().apply {
+            addProperty("type", "default")
+            addProperty("value", "null")
+        })
+        add("soundSource", JsonObject().apply { addProperty("type", "self") })
+        addProperty("track", "MASTER")
+        addProperty("volume", 1.0f)
+        addProperty("pitch", 1.0f)
+    }
+
+    private fun skinJson(texture: String, signature: String): JsonObject = JsonObject().apply {
+        addProperty("texture", texture)
+        addProperty("signature", signature)
+    }
+
+    private fun slug(name: String): String? =
+        name.lowercase().replace(Regex("[^a-z0-9_]+"), "_").trim('_').takeIf { it.isNotEmpty() }
+
     private fun optional(value: Int?): JsonObject = JsonObject().apply {
         addProperty("enabled", value != null)
         if (value != null) addProperty("value", value)
@@ -132,8 +385,8 @@ object Authoring {
         if (points.size < 2) return null
         if (!Tw.isAvailable) return null
 
-        val pageId = name.lowercase().replace(Regex("[^a-z0-9_]+"), "_").trim('_')
-        if (pageId.isEmpty() || pageExists(pageId)) return null
+        val pageId = slug(name) ?: return null
+        if (pageExists(pageId)) return null
         if (!createPage(pageId, name, CINEMATIC_PAGE)) return null
 
         val path = JsonArray()
@@ -183,8 +436,7 @@ object Authoring {
         if (!Tw.isAvailable) return null
         if (definitionId.isBlank()) return null
 
-        val pageId = pageName.lowercase().replace(Regex("[^a-z0-9_]+"), "_").trim('_')
-        if (pageId.isEmpty()) return null
+        val pageId = slug(pageName) ?: return null
         if (!createPage(pageId, pageName, MANIFEST_PAGE)) return null
 
         val id = entryId()

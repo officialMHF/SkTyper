@@ -20,7 +20,7 @@ import org.bukkit.Location
 import org.bukkit.entity.Player
 import org.bukkit.event.Event
 
-private fun eventPlayer(event: Event): Player? = runCatching {
+internal fun eventPlayer(event: Event): Player? = runCatching {
     EventValues.getEventValue(event, Player::class.java, EventValues.TIME_NOW)
 }.getOrNull()
 
@@ -28,7 +28,7 @@ private fun eventPlayer(event: Event): Player? = runCatching {
  * Authoring fails for mundane reasons - a duplicate name, too few points, a missing definition.
  * Whoever ran the effect is the one who can fix it, so they hear about it as well as the console.
  */
-private fun report(event: Event, message: String) {
+internal fun report(event: Event, message: String) {
     SkTyper.instance.logger.warning(message)
     val player = eventPlayer(event) ?: return
     if (player.isOnline) player.sendMessage("<red>$message")
