@@ -23,6 +23,7 @@ extension; without it that syntax still parses and simply does nothing.
 - [Conditions](#conditions)
 - [Events](#events)
 - [Quests](#quests)
+- [Authoring](#authoring)
 - [Gotchas](#gotchas)
 
 ---
@@ -336,6 +337,7 @@ on before any quest syntax if your server might run without it.
 | `on typewriter cinematic end` | `event-player`, `event-string` (page id), `event-number` (frame) |
 | `on typewriter cinematic tick` | `event-player`, `event-number` (frame) |
 | `on typewriter entity interact` | `event-player`, `event-typewriter entry` (definition) |
+| `on typewriter block interact` | `event-player`, `event-block`, `event-location`, `event-item`, `event-string` (action) |
 | `on typewriter quest status change` | `event-player`, `event-typewriter entry`, `event-string`, `past event-string` |
 | `on typewriter tracked quest change` | `event-player`, `event-typewriter entry`, `past event-typewriter entry` |
 | `on typewriter staging change` | `event-string` (state) |
@@ -356,6 +358,17 @@ Typewriter fires all of these asynchronously. Skript moves the trigger back onto
 before running it, so ordinary effects are safe inside them.
 
 `cinematic tick` fires up to twenty times a second per viewer. Keep that trigger cheap.
+
+`block interact` fires once per interaction — the off-hand pass is dropped, the same way Typewriter's
+own Interact Block Event entry does it. It is cancellable, so `cancel event` stops the block being
+used.
+
+```applescript
+on typewriter block interact:
+    if event-block is a lever:
+        trigger typewriter entry "secret_door_dialogue" for event-player
+        cancel event
+```
 
 ---
 
@@ -408,6 +421,69 @@ completed, grey for not-yet-showing — exactly as it appears in the quest track
 
 ---
 
+## Authoring
+
+Pages and entries can be built from a script through the same staging system the Typewriter panel
+uses, so anything created this way shows up in the panel and can be edited there afterwards.
+
+```applescript
+(create|record) [a] [new] typewriter cinematic [page] [named] %string% (along|from|through) %locations% [over %timespan%]
+(create|spawn) [a] [new] typewriter (entity|npc) [instance] [named] %string% of [definition] %entry% at %location% [on page %string%]
+publish [the] typewriter (pages|changes)
+delete [the] typewriter page[s] %strings%
+```
+
+### Cinematics from a list of points
+
+Every location becomes a path point and keeps its yaw and pitch, so recording a camera move is just
+collecting the player's location as they fly around:
+
+```applescript
+command /shot:
+    trigger:
+        add location of player to {shot::%uuid of player%::*}
+        send "Point %size of {shot::%uuid of player%::*}% saved."
+
+command /shotdone <text>:
+    trigger:
+        create typewriter cinematic arg-1 along {shot::%uuid of player%::*} over 8 seconds
+        publish typewriter pages
+        delete {shot::%uuid of player%::*}
+        send "Try it with /cutscene %arg-1%"
+
+command /cutscene <text>:
+    trigger:
+        start typewriter cinematic arg-1 for player
+```
+
+Time is spread evenly over the points. Without `over ...` each point gets one second. At least two
+points are needed, and the name must not already be taken by a page.
+
+### Entity instances
+
+```applescript
+create typewriter entity "gate_guard" of "town_guard_definition" at location of player
+publish typewriter pages
+add player to the typewriter audience of "gate_guard"
+```
+
+This places an instance of an entity definition that **already exists**. Definitions carry the skin,
+entity data and activities, which are far easier to build once in the panel than to describe from a
+script. Instances land on a manifest page called `sktyper_entities` unless you pass `on page "..."`.
+
+Needs Typewriter's Entity extension.
+
+### Publishing
+
+Creating a page puts it in staging; nothing is live until it is published. `publish typewriter pages`
+does exactly what the publish button in the panel does: it writes the whole staging area over the
+live pages directory and removes published pages that staging no longer has.
+
+That means it also publishes anything a builder left half-finished in staging. Publish deliberately,
+not on a timer or a loop.
+
+---
+
 ## Gotchas
 
 **A script can't find an entry.** Check the id in the Typewriter panel, and remember lookup is by id
@@ -423,3 +499,7 @@ writes. Change the underlying data and call `refresh typewriter fact` instead.
 
 **Quest syntax returns nothing.** The Quest extension isn't loaded. Guard with
 `if typewriter quests are available`.
+
+**A created cinematic won't start.** It is still in staging — run `publish typewriter pages`. Check
+the console too; creation logs why it refused, usually a duplicate page name or fewer than two
+points.

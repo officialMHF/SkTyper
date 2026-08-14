@@ -139,3 +139,57 @@ on typewriter staging change:
 
 on typewriter unload:
     send "Typewriter is reloading" to console
+
+# ---------------------------------------------------------------------------------------------- #
+# Block interactions
+# ---------------------------------------------------------------------------------------------- #
+
+on typewriter block interact:
+    if event-block is a lever:
+        trigger typewriter entry "secret_door_dialogue" for event-player
+        cancel event
+
+on typewriter block interact:
+    if event-block is a chest:
+        if typewriter fact "found_chest" of event-player is 0:
+            set typewriter fact "found_chest" of event-player to 1
+            trigger typewriter entry "first_chest_dialogue" for event-player
+
+# ---------------------------------------------------------------------------------------------- #
+# Recording a cinematic in game
+# ---------------------------------------------------------------------------------------------- #
+
+command /shot:
+    permission: sktyper.admin
+    trigger:
+        add location of player to {shot::%uuid of player%::*}
+        send "Point %size of {shot::%uuid of player%::*}% saved."
+
+command /shotclear:
+    permission: sktyper.admin
+    trigger:
+        delete {shot::%uuid of player%::*}
+        send "Points cleared."
+
+command /shotsave <text>:
+    permission: sktyper.admin
+    trigger:
+        if size of {shot::%uuid of player%::*} is less than 2:
+            send "<red>Record at least two points first."
+            stop
+        create typewriter cinematic arg-1 along {shot::%uuid of player%::*} over 8 seconds
+        publish typewriter pages
+        delete {shot::%uuid of player%::*}
+        send "Saved. Try it with /cutscene %arg-1%"
+
+# ---------------------------------------------------------------------------------------------- #
+# Placing an NPC
+# ---------------------------------------------------------------------------------------------- #
+
+command /npc <text> <text>:
+    permission: sktyper.admin
+    trigger:
+        create typewriter entity arg-1 of arg-2 at location of player
+        publish typewriter pages
+        add player to the typewriter audience of arg-1
+        send "Placed %arg-1%."

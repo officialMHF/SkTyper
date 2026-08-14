@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'me.mhfs.sktyper'
-version = '1.0.0'
+version = '1.0.1'
 
 ext {
     typewriterVersion = '0.9.0'
@@ -46,6 +46,9 @@ dependencies {
 
     // Only for KoinJavaComponent, to grab FactDatabase / AudienceManager / ExtensionLoader.
     compileOnly 'io.insert-koin:koin-core-jvm:4.0.4'
+
+    // StagingManager.publish is a suspend function; this is what lets us call it.
+    compileOnly 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2'
 
     // AsyncEntityDefinitionInteract has PacketEvents types in its accessors. We never call those,
     // the compiler just needs to be able to read the class.

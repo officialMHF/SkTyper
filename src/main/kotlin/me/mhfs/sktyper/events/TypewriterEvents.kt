@@ -18,9 +18,13 @@ import com.typewritermc.engine.paper.events.ContentEditorEndEvent
 import com.typewritermc.engine.paper.events.ContentEditorStartEvent
 import com.typewritermc.engine.paper.events.StagingChangeEvent
 import com.typewritermc.engine.paper.events.TypewriterUnloadEvent
+import me.mhfs.sktyper.bridge.TypewriterBlockInteractEvent
 import me.mhfs.sktyper.bridge.TypewriterQuestStatusEvent
 import me.mhfs.sktyper.bridge.TypewriterTrackedQuestEvent
+import org.bukkit.Location
+import org.bukkit.block.Block
 import org.bukkit.event.Event
+import org.bukkit.inventory.ItemStack
 import org.skriptlang.skript.lang.converter.Converter
 
 /**
@@ -36,6 +40,7 @@ object TypewriterEvents {
         registerCinematicEvents()
         registerQuestEvents()
         registerEntityEvents()
+        registerBlockEvents()
         registerEngineEvents()
     }
 
@@ -244,6 +249,49 @@ object TypewriterEvents {
             AsyncEntityDefinitionInteract::class.java,
             Entry::class.java,
             Converter { it.definition },
+        )
+    }
+
+    private fun registerBlockEvents() {
+        event(
+            "Typewriter Block Interact",
+            SimpleEvent::class.java,
+            TypewriterBlockInteractEvent::class.java,
+            "[on] typewriter block interact[ion]",
+        )
+            .description(
+                "Called when a player interacts with a block. Fires once per interaction - the " +
+                    "off-hand pass is dropped, the same way Typewriter's own Interact Block Event does.",
+                "`event-block`, `event-location` and `event-item` describe what was clicked. The " +
+                    "event is cancellable.",
+            )
+            .examples(
+                "on typewriter block interact:",
+                "	if event-block is a lever:",
+                "		trigger typewriter entry \"secret_door_dialogue\" for event-player",
+                "		cancel event",
+            )
+            .since("1.0.1")
+
+        EventValues.registerEventValue(
+            TypewriterBlockInteractEvent::class.java,
+            Block::class.java,
+            Converter { it.block },
+        )
+        EventValues.registerEventValue(
+            TypewriterBlockInteractEvent::class.java,
+            Location::class.java,
+            Converter { it.block?.location ?: it.player.location },
+        )
+        EventValues.registerEventValue(
+            TypewriterBlockInteractEvent::class.java,
+            ItemStack::class.java,
+            Converter { it.item },
+        )
+        EventValues.registerEventValue(
+            TypewriterBlockInteractEvent::class.java,
+            String::class.java,
+            Converter { it.action.name.lowercase() },
         )
     }
 

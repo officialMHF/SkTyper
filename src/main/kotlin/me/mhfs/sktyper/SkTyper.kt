@@ -5,6 +5,7 @@ package me.mhfs.sktyper
 import ch.njol.skript.Skript
 import ch.njol.skript.SkriptAddon
 import com.typewritermc.engine.paper.events.TypewriterUnloadEvent
+import me.mhfs.sktyper.bridge.BlockInteractListener
 import me.mhfs.sktyper.bridge.QuestBridge
 import me.mhfs.sktyper.elements.Elements
 import me.mhfs.sktyper.events.TypewriterEvents
@@ -50,6 +51,7 @@ class SkTyper : JavaPlugin(), Listener {
         }
 
         server.pluginManager.registerEvents(this, this)
+        server.pluginManager.registerEvents(BlockInteractListener(), this)
         attachQuestBridge()
 
         logger.info("SkTyper enabled against Typewriter ${Tw.version ?: "unknown"}.")

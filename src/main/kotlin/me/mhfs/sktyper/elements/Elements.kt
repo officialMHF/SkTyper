@@ -18,6 +18,10 @@ import me.mhfs.sktyper.elements.conditions.CondQuestStatus
 import me.mhfs.sktyper.elements.conditions.CondQuestTracked
 import me.mhfs.sktyper.elements.conditions.CondTypewriterLoaded
 import me.mhfs.sktyper.elements.effects.EffAudience
+import me.mhfs.sktyper.elements.effects.EffCreateCinematic
+import me.mhfs.sktyper.elements.effects.EffCreateEntity
+import me.mhfs.sktyper.elements.effects.EffDeletePage
+import me.mhfs.sktyper.elements.effects.EffPublishPages
 import me.mhfs.sktyper.elements.effects.EffEndInteraction
 import me.mhfs.sktyper.elements.effects.EffNextDialogue
 import me.mhfs.sktyper.elements.effects.EffRefreshFact
@@ -214,6 +218,24 @@ object Elements {
         Skript.registerEffect(
             EffRefreshFact::class.java,
             "refresh [the] typewriter fact[s] $ENTRIES (of|for) $PLAYERS",
+        )
+        Skript.registerEffect(
+            EffCreateCinematic::class.java,
+            "(create|make|record) [a] [new] typewriter cinematic [page] [named] %string% " +
+                "(along|from|with|through) %locations% [(over|lasting) %-timespan%]",
+        )
+        Skript.registerEffect(
+            EffCreateEntity::class.java,
+            "(create|spawn) [a] [new] typewriter (entity|npc) [instance] [named] %string% " +
+                "of [definition] $ENTRY at %location% [on [page] %-string%]",
+        )
+        Skript.registerEffect(
+            EffPublishPages::class.java,
+            "publish [the] [staged] typewriter (pages|changes)",
+        )
+        Skript.registerEffect(
+            EffDeletePage::class.java,
+            "delete [the] typewriter page[s] %strings%",
         )
     }
 
