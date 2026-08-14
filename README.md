@@ -31,7 +31,6 @@ That link always points at the newest release. Older builds are on the
 - [Events](#events)
 - [Quests](#quests)
 - [Building](#building)
-- [Deploying](#deploying)
 - [How it works](#how-it-works)
 - [Troubleshooting](#troubleshooting)
 
@@ -455,26 +454,6 @@ repositories:
 | `repo.codemc.io` | packetevents-api |
 
 The jar contains nothing but `me/mhfs/sktyper/` and `plugin.yml`. No dependencies are shaded.
-
----
-
-## Deploying
-
-`./gradlew deploy` builds and uploads the jar over FTP. It reads four properties:
-
-```properties
-ftpHost=your.host
-ftpPort=21
-ftpUser=your-user
-ftpPassword=your-password
-ftpRemotePath=plugins/SkTyper.jar
-```
-
-Put them in `~/.gradle/gradle.properties`, not in the repo, or pass them on the command line:
-
-```bash
-./gradlew deploy -PftpHost=example.com -PftpUser=me -PftpPassword=secret
-```
 
 ---
 

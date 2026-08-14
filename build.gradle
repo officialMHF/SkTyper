@@ -1,13 +1,3 @@
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        // Plain FTP, not SFTP, so commons-net rather than JSch.
-        classpath 'commons-net:commons-net:3.11.1'
-    }
-}
-
 plugins {
     id 'java'
     id 'org.jetbrains.kotlin.jvm' version '2.2.10'
@@ -66,82 +56,6 @@ dependencies {
     // against the engine's copy at runtime instead.
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib:${kotlinVersion}"
     compileOnly "org.jetbrains.kotlin:kotlin-reflect:${kotlinVersion}"
-}
-
-tasks.register('uploadJarToFtp') {
-    dependsOn tasks.named('jar')
-    doLast {
-        def host       = project.findProperty('ftpHost')
-        def port       = ((project.findProperty('ftpPort') ?: '21') as String) as int
-        def user       = project.findProperty('ftpUser')
-        def pass       = project.findProperty('ftpPassword')
-        def remotePath = (project.findProperty('ftpRemotePath') ?: 'plugins/SkTyper.jar') as String
-        def jarFile    = tasks.named('jar').get().outputs.files.singleFile
-
-        if (!host || !user || !pass) {
-            throw new GradleException(
-                    "Set ftpHost, ftpUser and ftpPassword in ~/.gradle/gradle.properties before deploying."
-            )
-        }
-
-        def ftp = new org.apache.commons.net.ftp.FTPClient()
-        ftp.setConnectTimeout(15000)
-        ftp.setDefaultTimeout(30000)
-        try {
-            ftp.connect(host as String, port)
-            if (!org.apache.commons.net.ftp.FTPReply.isPositiveCompletion(ftp.getReplyCode())) {
-                throw new GradleException("FTP server refused the connection: ${ftp.getReplyString()}")
-            }
-            if (!ftp.login(user as String, pass as String)) {
-                throw new GradleException("FTP login failed for user '${user}': ${ftp.getReplyString()}")
-            }
-            ftp.setSoTimeout(30000)
-            // Game hosts sit behind NAT, active mode can't dial back to the build machine.
-            ftp.enterLocalPassiveMode()
-            ftp.setFileType(org.apache.commons.net.ftp.FTP.BINARY_FILE_TYPE)
-            ftp.setControlKeepAliveTimeout(java.time.Duration.ofSeconds(30))
-
-            // Walk the remote directory chain, creating anything missing.
-            def segments = remotePath.split('/').findAll { it }
-            if (segments.size() > 1) {
-                def dirs = segments[0..-2]
-                def walked = ''
-                dirs.each { dir ->
-                    walked = walked ? "${walked}/${dir}" : dir
-                    if (!ftp.changeWorkingDirectory(walked)) {
-                        ftp.makeDirectory(walked)
-                    }
-                    ftp.changeWorkingDirectory('/')
-                }
-            }
-
-            def stored = jarFile.withInputStream { input ->
-                ftp.storeFile(remotePath, input)
-            }
-            if (!stored) {
-                throw new GradleException("FTP upload rejected by server: ${ftp.getReplyString()}")
-            }
-            println "Plugin uploaded successfully to ${host}:${port} -> ${remotePath} (${jarFile.length()} bytes)"
-        } catch (GradleException e) {
-            throw e
-        } catch (Exception e) {
-            throw new GradleException("FTP upload failed: ${e.message}", e)
-        } finally {
-            try {
-                if (ftp.isConnected()) {
-                    ftp.logout()
-                    ftp.disconnect()
-                }
-            } catch (Exception ignored) {
-                // Transfer already finished, nothing to salvage.
-            }
-        }
-    }
-}
-
-// gradlew deploy = build + upload.
-tasks.register('deploy') {
-    dependsOn tasks.named('uploadJarToFtp')
 }
 
 def targetJavaVersion = 21
