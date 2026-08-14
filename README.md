@@ -427,7 +427,7 @@ Pages and entries can be built from a script through the same staging system the
 uses, so anything created this way shows up in the panel and can be edited there afterwards.
 
 ```applescript
-(create|record) [a] [new] typewriter cinematic [page] [named] %string% (along|from|through) %locations% [over %timespan%]
+(create|record) [a] [new] typewriter cinematic [page] [named] %string% (along|from|through) %locations% [over %timespan/number% [seconds|ticks]]
 (create|spawn) [a] [new] typewriter (entity|npc) [instance] [named] %string% of [definition] %entry% at %location% [on page %string%]
 publish [the] typewriter (pages|changes)
 delete [the] typewriter page[s] %strings%
@@ -459,6 +459,18 @@ command /cutscene <text>:
 
 Time is spread evenly over the points. Without `over ...` each point gets one second. At least two
 points are needed, and the name must not already be taken by a page.
+
+The length takes either a timespan or a plain number:
+
+```applescript
+create typewriter cinematic "a" along {shot::*} over 8 seconds
+create typewriter cinematic "b" along {shot::*} over {_duration} seconds
+create typewriter cinematic "c" along {shot::*} over 400 ticks
+```
+
+Reach for the number form whenever the length comes from a variable. Skript only builds a timespan
+out of literal text, so `over {_duration} seconds` is not a timespan at all — it is a number followed
+by the word seconds, and this syntax reads it that way.
 
 ### Entity instances
 

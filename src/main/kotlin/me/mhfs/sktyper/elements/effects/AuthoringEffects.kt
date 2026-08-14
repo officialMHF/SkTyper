@@ -27,6 +27,9 @@ import org.bukkit.event.Event
         "matter of collecting the player's location into a list as they move around.",
     "The page is created in staging. Run `publish typewriter pages` to make it playable, then start " +
         "it like any other cinematic.",
+    "The length takes a timespan (`over 8 seconds`) or a plain number, which counts as seconds " +
+        "unless you say ticks. A number is what you want when the length comes from a variable, " +
+        "because Skript only parses timespans from literal text.",
     "Does nothing if fewer than two points are given or a page with that name already exists.",
 )
 @Examples(
@@ -41,7 +44,8 @@ class EffCreateCinematic : Effect() {
 
     private lateinit var name: Expression<String>
     private lateinit var points: Expression<Location>
-    private var duration: Expression<Timespan>? = null
+    private var duration: Expression<*>? = null
+    private var inTicks = false
 
     @Suppress("UNCHECKED_CAST")
     override fun init(
@@ -52,7 +56,8 @@ class EffCreateCinematic : Effect() {
     ): Boolean {
         name = exprs[0] as Expression<String>
         points = exprs[1] as Expression<Location>
-        duration = exprs.getOrNull(2) as? Expression<Timespan>
+        duration = exprs.getOrNull(2)
+        inTicks = parseResult.hasTag("tick")
         return true
     }
 
@@ -64,7 +69,11 @@ class EffCreateCinematic : Effect() {
             return
         }
 
-        val ticks = duration?.getSingle(event)?.getAs(Timespan.TimePeriod.TICK)?.toInt() ?: (points.size * 20)
+        val ticks = when (val given = duration?.getSingle(event)) {
+            is Timespan -> given.getAs(Timespan.TimePeriod.TICK).toInt()
+            is Number -> if (inTicks) given.toInt() else given.toInt() * 20
+            else -> points.size * 20
+        }
         val page = Authoring.createCameraCinematic(name, points, ticks)
         if (page == null) {
             warn("could not create \"$name\" - the page may already exist, or Typewriter refused the write")

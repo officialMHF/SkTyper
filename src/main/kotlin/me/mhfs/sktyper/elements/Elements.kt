@@ -223,7 +223,8 @@ object Elements {
         Skript.registerEffect(
             EffCreateCinematic::class.java,
             "(create|make|record) [a] [new] typewriter cinematic [page] [named] %string% " +
-                "(along|from|with|through) %locations% [(over|lasting) %-timespan%]",
+                "(along|from|with|through) %locations% " +
+                "[(over|lasting) %-timespan/number% [(second[s]|:tick[s])]]",
         )
         Skript.registerEffect(
             EffCreateEntity::class.java,
