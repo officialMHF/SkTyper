@@ -1,27 +1,20 @@
 # SkTyper
 
-A [Skript](https://github.com/SkriptLang/Skript) addon for [Typewriter](https://docs.typewritermc.com).
+Skript syntax for [Typewriter](https://docs.typewritermc.com).
 
 Typewriter handles the story: dialogue, quests, cinematics, NPCs, facts, audiences. SkTyper lets your
 scripts read and drive all of it — trigger an entry when someone opens a crate, gate a shop behind a
 completed quest, hand out a reward when a cutscene finishes, block PvP while a dialogue is open.
 
-Built against Typewriter `0.9.0`, Skript `2.16.1`, Paper `1.21.x`, Java 21.
+Needs Skript 2.9+ and Typewriter 0.9.0. The quest syntax additionally needs Typewriter's Quest
+extension; without it that syntax still parses and simply does nothing.
 
----
-
-## Download
-
-Latest jar: **[SkTyper.jar](https://github.com/officialMHF/SkTyper/releases/latest/download/SkTyper.jar)**
-
-That link always points at the newest release. Older builds are on the
-[releases page](https://github.com/officialMHF/SkTyper/releases).
+**[Download SkTyper.jar](https://github.com/officialMHF/SkTyper/releases/latest/download/SkTyper.jar)**
 
 ---
 
 ## Contents
 
-- [Install](#install)
 - [Quick start](#quick-start)
 - [How entries are addressed](#how-entries-are-addressed)
 - [Types](#types)
@@ -30,28 +23,7 @@ That link always points at the newest release. Older builds are on the
 - [Conditions](#conditions)
 - [Events](#events)
 - [Quests](#quests)
-- [Building](#building)
-- [How it works](#how-it-works)
-- [Troubleshooting](#troubleshooting)
-
----
-
-## Install
-
-1. Have Paper 1.21+ on Java 21.
-2. Install [Skript](https://github.com/SkriptLang/Skript/releases) 2.9 or newer.
-3. Install [Typewriter](https://modrinth.com/plugin/typewriter) 0.9.0, plus its `packetevents`
-   dependency.
-4. Drop `SkTyper.jar` into `plugins/`.
-5. Restart. You should see `SkTyper enabled against Typewriter 0.9.0` in the log.
-
-| Plugin | Required | Notes |
-| --- | --- | --- |
-| Skript | yes | hard dependency |
-| Typewriter | yes | soft dependency in `plugin.yml`; SkTyper disables itself with a readable message if it's missing |
-| Typewriter Quest extension | optional | only the quest syntax needs it, everything else works without it |
-
-SkTyper does not add commands, config files or permissions. It is syntax only.
+- [Gotchas](#gotchas)
 
 ---
 
@@ -173,9 +145,8 @@ if typewriter fact last update of "daily_reward" of player is less than 1 day ag
     send "Come back tomorrow."
 ```
 
-Writes go through Typewriter's fact database, so the engine fires its own refresh trigger and
-objectives, audiences and quest states react immediately — the same as if Typewriter had written the
-value itself.
+Writes go through Typewriter's fact database, so objectives, audiences and quest states react
+immediately — the same as if Typewriter had written the value itself.
 
 Only writable facts can be changed. Permission facts, placeholder facts and other read-only kinds
 ignore writes silently; use `refresh typewriter fact` after changing whatever they're derived from.
@@ -437,124 +408,18 @@ completed, grey for not-yet-showing — exactly as it appears in the quest track
 
 ---
 
-## Building
+## Gotchas
 
-```bash
-./gradlew build
-```
+**A script can't find an entry.** Check the id in the Typewriter panel, and remember lookup is by id
+first, then name. `typewriter entry "..." exists` is the quick test. Entries only exist once
+Typewriter has finished loading its pages, so lookups during `on load` may run too early.
 
-Output lands in `build/libs/SkTyper.jar`. Everything except the Kotlin plugin comes from public
-repositories:
+**Nothing happens when triggering an entry.** Either the entry isn't triggerable — facts and manifest
+entries aren't — or its criteria don't pass for that player.
+`if the typewriter criteria of "..." are met for player` tells you which.
 
-| Repository | For |
-| --- | --- |
-| `repo.papermc.io` | paper-api |
-| `repo.skriptlang.org` | Skript |
-| `maven.typewritermc.com` | engine-core, engine-paper, engine-loader |
-| `repo.codemc.io` | packetevents-api |
+**Fact writes don't stick.** Read-only fact kinds (permission, placeholder, and similar) ignore
+writes. Change the underlying data and call `refresh typewriter fact` instead.
 
-The jar contains nothing but `me/mhfs/sktyper/` and `plugin.yml`. No dependencies are shaded.
-
----
-
-## Cutting a release
-
-Bump `version` in `build.gradle`, then tag it:
-
-```bash
-git tag -a v1.0.1 -m "SkTyper 1.0.1" -m "What changed goes here."
-git push origin v1.0.1
-```
-
-`.github/workflows/release.yml` picks it up, checks the tag against the version in `build.gradle`,
-builds, and publishes a release with `SkTyper.jar` attached. The body of the annotated tag message
-becomes the release notes; leave it empty and GitHub generates them from the commits instead.
-
----
-
-## How it works
-
-Two design decisions are worth knowing about before you touch the build file.
-
-### The Kotlin standard library is not bundled
-
-Typewriter is a Paper-style plugin that pulls `kotlin-stdlib` in through Paper's library loader.
-Paper's global plugin classloader group *does* search other plugins' libraries, so a legacy
-(`plugin.yml`) plugin like a Skript addon can link straight against Typewriter's copy.
-
-Shipping a second copy would give `kotlin.reflect.KClass`, `kotlin.sequences.Sequence` and friends two
-distinct `Class` objects — one per loader — and every call into the Typewriter API would fail with a
-loader-constraint `LinkageError`. So `kotlin-stdlib` is `compileOnly`,
-`kotlin.stdlib.default.dependency=false` is set in `gradle.properties`, and the jar ships nothing but
-its own classes.
-
-If you bump the Kotlin version in `build.gradle`, match it to whatever `TypewriterPaperLoader`
-downloads (currently `2.2.10`).
-
-### Quests go through reflection
-
-Everything in `engine-core` and `engine-paper` lives in Typewriter's plugin jar and is linked
-directly. The Quest extension doesn't — Typewriter loads extensions into a private `URLClassLoader`
-that it discards and rebuilds on every reload.
-
-`bridge/QuestBridge.kt` therefore reaches the quest API reflectively through `ExtensionLoader`, and
-mirrors `AsyncQuestStatusUpdate` and `AsyncTrackedQuestUpdate` onto plugin-owned events so Skript has
-stable classes to register against. It re-attaches after every `TypewriterUnloadEvent` and retries for
-a minute at startup, since extensions finish loading well after we enable.
-
-### Layout
-
-```
-me/mhfs/sktyper/
-  SkTyper.kt              plugin entry point
-  tw/Tw.kt                every call into the Typewriter engine
-  bridge/                 reflective Quest extension access + mirrored events
-  types/                  Skript ClassInfo registrations
-  events/                 Skript event + event value registrations
-  elements/
-    Elements.kt           the syntax table
-    expressions/
-    effects/
-    conditions/
-```
-
-`Elements.kt` registers everything explicitly rather than through `SkriptAddon#loadClasses`, so the
-whole syntax surface reads top to bottom in one file and the ordering between overlapping patterns is
-deliberate rather than accidental.
-
-### A note on the Skript API
-
-SkTyper uses the static `Skript.registerExpression` / `registerEffect` / `registerEvent` /
-`EventValues.registerEventValue` entry points. Skript 2.14 deprecated them in favour of the per-addon
-`SyntaxRegistry`, but the static forms still work and are the only ones available across the whole
-2.9–2.16 range that servers actually run. If they ever get removed, `elements/Elements.kt` and
-`events/TypewriterEvents.kt` are the two files to port.
-
----
-
-## Troubleshooting
-
-**`Typewriter is not installed or failed to enable`**
-Typewriter isn't there, or it crashed on startup. Check the log above SkTyper's line — a missing
-`packetevents` is the usual cause.
-
-**`Skript is no longer accepting registrations`**
-SkTyper enabled after Skript finished loading. Almost always means something reloaded plugins at
-runtime; restart the server properly.
-
-**`Typewriter Quest extension not found`**
-Informational. Quest syntax parses but does nothing. Install the Quest extension into
-`plugins/Typewriter/extensions/` if you want it.
-
-**A script can't find an entry**
-Check the id in the Typewriter panel, and remember lookup is by id first, then name. `typewriter entry
-"..." exists` is the quick test. Entries also only exist once Typewriter has finished loading its
-pages, so lookups during `on load` may run too early.
-
-**Nothing happens when triggering an entry**
-Either the entry isn't triggerable — facts and manifest entries aren't — or its criteria don't pass
-for that player. `if the typewriter criteria of "..." are met for player` tells you which.
-
-**Fact writes don't stick**
-Read-only fact kinds (permission, placeholder, and similar) ignore writes. Change the underlying data
-and call `refresh typewriter fact` instead.
+**Quest syntax returns nothing.** The Quest extension isn't loaded. Guard with
+`if typewriter quests are available`.
