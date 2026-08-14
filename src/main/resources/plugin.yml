@@ -1,0 +1,11 @@
+name: SkTyper
+version: '${version}'
+main: me.mhfs.sktyper.SkTyper
+api-version: '1.21'
+authors: [ MHFs ]
+description: Skript addon for Typewriter - quests, dialogue, cinematics, facts and audiences.
+website: https://docs.typewritermc.com
+depend: [ Skript ]
+# Typewriter is required, but soft so a version/name mismatch gives a readable log line
+# instead of an "Unknown dependency" load failure. onEnable checks for it.
+softdepend: [ Typewriter ]
