@@ -10,6 +10,15 @@ Built against Typewriter `0.9.0`, Skript `2.16.1`, Paper `1.21.x`, Java 21.
 
 ---
 
+## Download
+
+Latest jar: **[SkTyper.jar](https://github.com/officialMHF/SkTyper/releases/latest/download/SkTyper.jar)**
+
+That link always points at the newest release. Older builds are on the
+[releases page](https://github.com/officialMHF/SkTyper/releases).
+
+---
+
 ## Contents
 
 - [Install](#install)
@@ -466,6 +475,21 @@ Put them in `~/.gradle/gradle.properties`, not in the repo, or pass them on the 
 ```bash
 ./gradlew deploy -PftpHost=example.com -PftpUser=me -PftpPassword=secret
 ```
+
+---
+
+## Cutting a release
+
+Bump `version` in `build.gradle`, then tag it:
+
+```bash
+git tag -a v1.0.1 -m "SkTyper 1.0.1" -m "What changed goes here."
+git push origin v1.0.1
+```
+
+`.github/workflows/release.yml` picks it up, checks the tag against the version in `build.gradle`,
+builds, and publishes a release with `SkTyper.jar` attached. The body of the annotated tag message
+becomes the release notes; leave it empty and GitHub generates them from the commits instead.
 
 ---
 
