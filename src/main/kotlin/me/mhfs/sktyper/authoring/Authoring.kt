@@ -134,13 +134,17 @@ object Authoring {
         updateField(nameOrId, "skin", skinJson(texture, signature))
 
     /**
-     * Display names go through MiniMessage, so a line break is <newline>. Both a pipe and %nl% are
-     * accepted as separators because they survive a command argument intact.
+     * Typewriter builds its MiniMessage instance with the newline tag switched off, so a line break
+     * has to be a real newline character. That is also what the nameplate counts to work out how far
+     * to lift itself off the entity.
+     *
+     * A pipe and %nl% are both accepted because they survive a command argument intact.
      */
     fun multiline(display: String): String = display
-        .replace("%nl%", "<newline>")
-        .replace("\\n", "<newline>")
-        .replace("|", "<newline>")
+        .replace("%nl%", "\n")
+        .replace("<newline>", "\n")
+        .replace("\\n", "\n")
+        .replace("|", "\n")
 
     fun setDisplayName(nameOrId: String, display: String): Boolean =
         updateField(nameOrId, "displayName", JsonPrimitive(multiline(display)))
