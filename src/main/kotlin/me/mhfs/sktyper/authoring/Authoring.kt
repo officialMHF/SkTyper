@@ -133,8 +133,17 @@ object Authoring {
     fun setSkin(nameOrId: String, texture: String, signature: String): Boolean =
         updateField(nameOrId, "skin", skinJson(texture, signature))
 
+    /**
+     * Display names go through MiniMessage, so a line break is <newline>. Both a pipe and %nl% are
+     * accepted as separators because they survive a command argument intact.
+     */
+    fun multiline(display: String): String = display
+        .replace("%nl%", "<newline>")
+        .replace("\\n", "<newline>")
+        .replace("|", "<newline>")
+
     fun setDisplayName(nameOrId: String, display: String): Boolean =
-        updateField(nameOrId, "displayName", JsonPrimitive(display))
+        updateField(nameOrId, "displayName", JsonPrimitive(multiline(display)))
 
     fun setActivity(nameOrId: String, activityEntryId: String): Boolean =
         updateField(nameOrId, "activity", JsonPrimitive(activityEntryId))
@@ -167,7 +176,7 @@ object Authoring {
             addProperty("id", id)
             addProperty("blueprintId", "npc_definition")
             addProperty("name", name)
-            addProperty("displayName", displayName)
+            addProperty("displayName", multiline(displayName))
             add("sound", emptySound())
             add("skin", skinJson(texture, signature))
             add("data", JsonArray())
@@ -270,9 +279,10 @@ object Authoring {
             tape.add(frame.toString(), JsonObject().apply { add("location", coordinate(point)) })
         }
 
+        // The artifact file is the tape itself - parseTape reads every top level key as a frame
+        // number, so any wrapper object around it blows up on the first key.
         val artifactId = entryId()
-        val payload = JsonObject().apply { add("default", tape) }
-        if (!storeArtifact(artifactId, payload.toString())) return null
+        if (!storeArtifact(artifactId, tape.toString())) return null
 
         val artifactEntryId = entryId()
         val artifactEntry = JsonObject().apply {

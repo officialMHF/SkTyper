@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'me.mhfs.sktyper'
-version = '1.0.7'
+version = '1.0.8'
 
 ext {
     typewriterVersion = '0.9.0'

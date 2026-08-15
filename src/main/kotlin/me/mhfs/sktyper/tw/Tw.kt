@@ -12,6 +12,8 @@ import com.typewritermc.engine.paper.entry.Criteria
 import com.typewritermc.engine.paper.entry.TriggerableEntry
 import com.typewritermc.engine.paper.entry.entries.AudienceEntry
 import com.typewritermc.engine.paper.entry.entries.CinematicEntry
+import com.typewritermc.engine.paper.entry.entity.AudienceEntityDisplay
+import com.typewritermc.engine.paper.entry.findDisplay
 import com.typewritermc.engine.paper.entry.entries.EntityDefinitionEntry
 import com.typewritermc.engine.paper.entry.entries.EntityInstanceEntry
 import com.typewritermc.engine.paper.entry.entries.InteractionEndTrigger
@@ -35,6 +37,8 @@ import com.typewritermc.engine.paper.facts.FactData
 import com.typewritermc.engine.paper.facts.FactDatabase
 import com.typewritermc.engine.paper.facts.RefreshFactTrigger
 import org.bukkit.Bukkit
+import org.bukkit.Location
+import java.util.UUID
 import org.bukkit.entity.Player
 import org.koin.java.KoinJavaComponent
 
@@ -80,6 +84,18 @@ object Tw {
 
     fun allDefinitions(): List<Entry> =
         runCatching { Query.find(EntityDefinitionEntry::class).toList() }.getOrElse { emptyList() }
+
+    /**
+     * Where an entity actually is for a given viewer, which is not the spawn point once it starts
+     * walking. Returns null when the entity is not being displayed to that player.
+     */
+    fun livePosition(entry: Entry, player: Player): Location? = runCatching {
+        val display = Ref(entry.id, AudienceEntry::class, entry as? AudienceEntry)
+            .findDisplay(AudienceEntityDisplay::class) ?: return null
+        val position = display.position(player.uniqueId) ?: return null
+        val world = Bukkit.getWorld(UUID.fromString(position.world.identifier)) ?: return null
+        Location(world, position.x, position.y, position.z, position.yaw, position.pitch)
+    }.getOrNull()
 
     fun pageOf(entry: Entry): Page? = allPages().firstOrNull { page -> page.entries.any { it.id == entry.id } }
 

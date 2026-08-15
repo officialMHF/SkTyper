@@ -10,9 +10,11 @@ import ch.njol.skript.lang.SkriptParser.ParseResult
 import ch.njol.skript.lang.util.SimpleExpression
 import ch.njol.util.Kleenean
 import com.typewritermc.core.entries.Entry
+import ch.njol.skript.registrations.EventValues
 import me.mhfs.sktyper.authoring.Authoring
 import me.mhfs.sktyper.tw.Tw
 import org.bukkit.Location
+import org.bukkit.entity.Player
 import org.bukkit.event.Event
 
 @Name("All Typewriter Entities")
@@ -54,9 +56,10 @@ class ExprAllEntities : SimpleExpression<Entry>() {
 
 @Name("Typewriter Entity Spawn")
 @Description(
-    "Where an NPC instance is placed.",
-    "Read from the staged page, so it reflects a teleport straight away rather than waiting for a " +
-        "publish.",
+    "Where an NPC instance is.",
+    "While the entity is on screen this is its live position, so a patrolling NPC reports where it " +
+        "has walked to. Otherwise it falls back to the staged spawn point, which reflects a teleport " +
+        "straight away without waiting for a publish.",
 )
 @Examples("send \"%the typewriter spawn of \"\"gate_guard\"\"%\"")
 @RequiredPlugins("Typewriter", "Typewriter Entity extension")
@@ -75,12 +78,20 @@ class ExprSpawn : SimpleExpression<Location>() {
         return true
     }
 
-    override fun get(event: Event): Array<Location> = entities.getArray(event)
-        .mapNotNull { value ->
-            val name = (value as? Entry)?.id ?: value as? String ?: return@mapNotNull null
-            Authoring.spawnOf(name)
-        }
-        .toTypedArray()
+    override fun get(event: Event): Array<Location> {
+        @Suppress("DEPRECATION")
+        val viewer = runCatching {
+            EventValues.getEventValue(event, Player::class.java, EventValues.TIME_NOW)
+        }.getOrNull()
+
+        return entities.getArray(event)
+            .mapNotNull { value ->
+                val entry = Tw.resolve(value)
+                val live = if (entry != null && viewer != null) Tw.livePosition(entry, viewer) else null
+                live ?: Authoring.spawnOf(entry?.id ?: value as? String ?: return@mapNotNull null)
+            }
+            .toTypedArray()
+    }
 
     override fun isSingle(): Boolean = entities.isSingle
 
