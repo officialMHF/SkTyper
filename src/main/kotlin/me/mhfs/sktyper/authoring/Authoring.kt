@@ -231,8 +231,12 @@ object Authoring {
             addProperty("blueprintId", "patrol_activity")
             addProperty("name", name + "_patrol")
             addProperty("roadNetwork", networkId)
+            // Inside List<RoadNodeId> the value class is boxed rather than inlined, so here it is
+            // an object - unlike RoadNode.id and RoadEdge.start above, which are bare ints.
             add("nodes", JsonArray().apply {
-                points.indices.forEach { index -> add(index) }
+                points.indices.forEach { index ->
+                    add(JsonObject().apply { addProperty("id", index) })
+                }
             })
         }
         return if (createEntry(pageId, activity)) activityId else null
