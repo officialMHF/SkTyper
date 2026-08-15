@@ -59,6 +59,7 @@ class EffCreateCinematic : Effect() {
     private lateinit var name: Expression<String>
     private lateinit var points: Expression<Location>
     private var duration: Expression<*>? = null
+    private var page: Expression<String>? = null
     private var inTicks = false
 
     @Suppress("UNCHECKED_CAST")
@@ -71,6 +72,7 @@ class EffCreateCinematic : Effect() {
         name = exprs[0] as Expression<String>
         points = exprs[1] as Expression<Location>
         duration = exprs.getOrNull(2)
+        page = exprs.getOrNull(3) as? Expression<String>
         inTicks = parseResult.hasTag("tick")
         return true
     }
@@ -88,8 +90,8 @@ class EffCreateCinematic : Effect() {
             is Number -> if (inTicks) given.toInt() else given.toInt() * 20
             else -> points.size * 20
         }
-        val page = Authoring.createCameraCinematic(name, points, ticks)
-        if (page == null) {
+        val created = Authoring.createCameraCinematic(name, points, ticks, page?.getSingle(event))
+        if (created == null) {
             warn(event, "could not create \"$name\" - the page may already exist, or Typewriter refused the write")
         }
     }

@@ -266,21 +266,23 @@ object Authoring {
         definitionId: String,
         points: List<Location>,
         frames: Int,
+        targetPage: String? = null,
     ): String? {
         if (points.size < 2) return null
         if (!Tw.isAvailable) return null
         if (definitionId.isBlank()) return null
 
-        val pageId = slug(name) ?: return null
-        if (pageExists(pageId)) return null
-        if (!createPage(pageId, name, CINEMATIC_PAGE)) return null
+        val pageId = slug(targetPage ?: name) ?: return null
+        val reusing = pageExists(pageId)
+        if (reusing && targetPage == null) return null
+        if (!createPage(pageId, targetPage ?: name, CINEMATIC_PAGE)) return null
 
-        val total = frames.coerceAtLeast(10)
-        val step = total.toDouble() / (points.size - 1).toDouble()
+        val total = frames.coerceIn(MIN_FRAMES, MAX_FRAMES)
         val tape = JsonObject()
-        points.forEachIndexed { index, point ->
-            val frame = (index * step).toInt().coerceIn(0, total)
-            tape.add(frame.toString(), JsonObject().apply { add("location", coordinate(point)) })
+        for (frame in 0..total) {
+            tape.add(frame.toString(), JsonObject().apply {
+                add("location", coordinate(pathAt(points, frame.toDouble() / total.toDouble())))
+            })
         }
 
         // The artifact file is the tape itself - parseTape reads every top level key as a frame
@@ -296,7 +298,7 @@ object Authoring {
             addProperty("artifactId", artifactId)
         }
         if (!createEntry(pageId, artifactEntry)) {
-            deletePage(pageId)
+            if (!reusing) deletePage(pageId)
             return null
         }
 
@@ -316,7 +318,7 @@ object Authoring {
             })
         }
         if (!createEntry(pageId, entry)) {
-            deletePage(pageId)
+            if (!reusing) deletePage(pageId)
             return null
         }
         return pageId
@@ -377,6 +379,42 @@ object Authoring {
         addProperty("pitch", location.pitch)
     }
 
+    private const val MIN_FRAMES = 10
+    private const val MAX_FRAMES = 20 * 60 * 10
+
+    /**
+     * The point along a path at [progress], from 0 at the first location to 1 at the last.
+     *
+     * Typewriter's tape player does not interpolate - a frame with no entry simply holds the
+     * previous one - so a walk has to be written out frame by frame or the entity snaps between
+     * the points it was given.
+     */
+    private fun pathAt(points: List<Location>, progress: Double): Location {
+        val span = (points.size - 1).toDouble()
+        val travelled = (progress.coerceIn(0.0, 1.0) * span)
+        val index = travelled.toInt().coerceIn(0, points.size - 2)
+        val into = (travelled - index).coerceIn(0.0, 1.0)
+
+        val from = points[index]
+        val to = points[index + 1]
+        return Location(
+            from.world,
+            from.x + (to.x - from.x) * into,
+            from.y + (to.y - from.y) * into,
+            from.z + (to.z - from.z) * into,
+            from.yaw + shortestTurn(from.yaw, to.yaw) * into.toFloat(),
+            from.pitch + (to.pitch - from.pitch) * into.toFloat(),
+        )
+    }
+
+    /** Turning from 350 to 10 degrees is twenty degrees right, not three hundred and forty left. */
+    private fun shortestTurn(from: Float, to: Float): Float {
+        var delta = (to - from) % 360f
+        if (delta > 180f) delta -= 360f
+        if (delta < -180f) delta += 360f
+        return delta
+    }
+
     private fun coordinate(location: Location): JsonObject = JsonObject().apply {
         addProperty("x", location.x)
         addProperty("y", location.y)
@@ -419,13 +457,19 @@ object Authoring {
      *               second and spreads the time evenly over the points that have no duration set.
      * @return the page id, or null when the page already exists or Typewriter refused the write.
      */
-    fun createCameraCinematic(name: String, points: List<Location>, frames: Int): String? {
+    fun createCameraCinematic(
+        name: String,
+        points: List<Location>,
+        frames: Int,
+        targetPage: String? = null,
+    ): String? {
         if (points.size < 2) return null
         if (!Tw.isAvailable) return null
 
-        val pageId = slug(name) ?: return null
-        if (pageExists(pageId)) return null
-        if (!createPage(pageId, name, CINEMATIC_PAGE)) return null
+        val pageId = slug(targetPage ?: name) ?: return null
+        val reusing = pageExists(pageId)
+        if (reusing && targetPage == null) return null
+        if (!createPage(pageId, targetPage ?: name, CINEMATIC_PAGE)) return null
 
         val path = JsonArray()
         points.forEach { point ->
@@ -450,7 +494,7 @@ object Authoring {
         }
 
         if (!createEntry(pageId, entry)) {
-            deletePage(pageId)
+            if (!reusing) deletePage(pageId)
             return null
         }
         return pageId

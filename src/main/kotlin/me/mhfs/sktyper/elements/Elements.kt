@@ -243,7 +243,7 @@ object Elements {
             EffCreateCinematic::class.java,
             "(create|make|record) [a] [new] typewriter cinematic [page] [named] %string% " +
                 "(along|from|with|through) %locations% " +
-                "[(over|lasting) %-timespan/number% [(second[s]|:tick[s])]]",
+                "[(over|lasting) %-timespan/number% [(second[s]|:tick[s])]] [on [page] %-string%]",
         )
         Skript.registerEffect(
             EffCreateEntity::class.java,
@@ -283,7 +283,7 @@ object Elements {
             EffCreateEntityCinematic::class.java,
             "(create|make) [a] [new] typewriter (entity|npc) cinematic [named] %string% " +
                 "(for|of|with) $ENTRY (along|from|through) %locations% " +
-                "[(over|lasting) %-timespan/number% [(second[s]|:tick[s])]]",
+                "[(over|lasting) %-timespan/number% [(second[s]|:tick[s])]] [on [page] %-string%]",
         )
         Skript.registerEffect(
             EffDeleteEntry::class.java,

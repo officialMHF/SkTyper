@@ -272,8 +272,10 @@ class EffSetActivity : Effect() {
 @Name("Create Typewriter Entity Cinematic")
 @Description(
     "Creates a cinematic in which an NPC walks the given path.",
-    "Typewriter usually records these in game. This lays the path down directly by spreading the " +
-        "points evenly across the frame range.",
+    "Typewriter usually records these in game. This lays the path down directly, writing a frame " +
+        "for every tick so the entity walks rather than jumping between the points you gave it.",
+    "Pass `on page` to put the walk onto an existing cinematic page. Everything on one page plays " +
+        "together, which is how you get an NPC walking through a camera shot.",
     "The length takes a timespan or a plain number of seconds, same as a camera cinematic. Publish " +
         "afterwards, then start it like any other cinematic.",
 )
@@ -290,6 +292,7 @@ class EffCreateEntityCinematic : Effect() {
     private lateinit var definition: Expression<*>
     private lateinit var points: Expression<Location>
     private var duration: Expression<*>? = null
+    private var page: Expression<String>? = null
     private var inTicks = false
 
     @Suppress("UNCHECKED_CAST")
@@ -303,6 +306,7 @@ class EffCreateEntityCinematic : Effect() {
         definition = exprs[1]
         points = exprs[2] as Expression<Location>
         duration = exprs.getOrNull(3)
+        page = exprs.getOrNull(4) as? Expression<String>
         inTicks = parseResult.hasTag("tick")
         return true
     }
@@ -328,7 +332,8 @@ class EffCreateEntityCinematic : Effect() {
             else -> points.size * 20
         }
 
-        if (Authoring.createEntityCinematic(name, definitionId, points, ticks) == null) {
+        val target = page?.getSingle(event)
+        if (Authoring.createEntityCinematic(name, definitionId, points, ticks, target) == null) {
             report(event, "create typewriter entity cinematic: could not create \"$name\"")
         }
     }
