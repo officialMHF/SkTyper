@@ -101,6 +101,25 @@ object Authoring {
         return null
     }
 
+    /** The blueprint a staged entry was built from, used to keep skins off instances. */
+    fun blueprintOf(nameOrId: String): String? {
+        val pages = runCatching { staging()?.pages }.getOrNull() ?: return null
+        for ((_, page) in pages) {
+            val entries = runCatching { page.getAsJsonArray("entries") }.getOrNull() ?: continue
+            for (element in entries) {
+                val entry = runCatching { element.asJsonObject }.getOrNull() ?: continue
+                val id = entry.get("id")?.asString ?: continue
+                if (id == nameOrId || entry.get("name")?.asString == nameOrId) {
+                    return entry.get("blueprintId")?.asString
+                }
+            }
+        }
+        return null
+    }
+
+    fun isDefinition(nameOrId: String): Boolean =
+        blueprintOf(nameOrId)?.contains("definition") == true
+
     fun updateField(nameOrId: String, path: String, value: JsonElement): Boolean {
         val manager = staging() ?: return false
         val (pageId, entryId) = locate(nameOrId) ?: return false
@@ -168,20 +187,23 @@ object Authoring {
         val pageId = slug(pageName) ?: return null
         if (!createPage(pageId, pageName, MANIFEST_PAGE)) return null
 
+        // RoadNodeId is an inline value class, so Gson reads and writes it as a bare int.
         val nodes = JsonArray()
         val edges = JsonArray()
         points.forEachIndexed { index, point ->
             nodes.add(JsonObject().apply {
-                add("id", JsonObject().apply { addProperty("id", index) })
+                addProperty("id", index)
                 add("location", position(point))
                 addProperty("radius", 1.0)
             })
             val next = (index + 1) % points.size
-            val weight = runCatching { point.distance(points[next]) }.getOrElse { 1.0 }
+            val raw = runCatching { point.distance(points[next]) }.getOrElse { 1.0 }
+            val length = if (raw.isFinite() && raw > 0.0) raw else 1.0
             edges.add(JsonObject().apply {
-                add("start", JsonObject().apply { addProperty("id", index) })
-                add("end", JsonObject().apply { addProperty("id", next) })
-                addProperty("weight", if (weight.isFinite()) weight else 1.0)
+                addProperty("start", index)
+                addProperty("end", next)
+                addProperty("weight", length)
+                addProperty("length", length)
             })
         }
 
@@ -210,9 +232,7 @@ object Authoring {
             addProperty("name", name + "_patrol")
             addProperty("roadNetwork", networkId)
             add("nodes", JsonArray().apply {
-                points.indices.forEach { index ->
-                    add(JsonObject().apply { addProperty("id", index) })
-                }
+                points.indices.forEach { index -> add(index) }
             })
         }
         return if (createEntry(pageId, activity)) activityId else null

@@ -492,7 +492,7 @@ by the word seconds, and this syntax reads it that way.
 A definition is what an NPC *is* — skin, display name, data. An instance is where one stands.
 
 ```applescript
-create typewriter definition "guard" with skin of "Notch" display name "&cTown Guard"
+create typewriter definition "guard" with skin of "Notch" display name "<red>Town Guard"
 publish typewriter pages
 create typewriter entity "gate_guard" of type "guard" at location of player
 publish typewriter pages

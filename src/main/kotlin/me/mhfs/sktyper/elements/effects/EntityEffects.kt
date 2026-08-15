@@ -19,6 +19,28 @@ import me.mhfs.sktyper.tw.Tw
 import org.bukkit.Location
 import org.bukkit.event.Event
 
+
+/**
+ * Skins and display names live on the definition, not on the instances made from it. Writing to an
+ * instance would quietly do nothing, so say so instead.
+ */
+private fun guardIsDefinition(event: Event, effect: String, name: String): Boolean {
+    val blueprint = Authoring.blueprintOf(name)
+    if (blueprint == null) {
+        report(event, "$effect: nothing staged called \"$name\"")
+        return false
+    }
+    if (!Authoring.isDefinition(name)) {
+        report(
+            event,
+            "$effect: \"$name\" is a $blueprint, not a definition. " +
+                "Skins and display names belong on the definition the NPC was made from.",
+        )
+        return false
+    }
+    return true
+}
+
 @Name("Create Typewriter Definition")
 @Description(
     "Creates an NPC definition with a skin taken from a Minecraft account.",
@@ -27,7 +49,7 @@ import org.bukkit.event.Event
     "Definitions describe what an NPC is. Place one in the world with `create typewriter entity`.",
 )
 @Examples(
-    "create typewriter definition \"guard\" with skin of \"Notch\" display name \"&cTown Guard\"",
+    "create typewriter definition \"guard\" with skin of \"Notch\" display name \"<red>Town Guard\"",
     "publish typewriter pages",
 )
 @RequiredPlugins("Typewriter", "Typewriter Entity extension")
@@ -106,13 +128,15 @@ class EffSetSkin : Effect() {
         val definition = this.definition.getSingle(event) ?: return
         val ign = this.ign.getSingle(event) ?: return
 
+        if (!guardIsDefinition(event, "set typewriter skin", definition)) return
+
         Skins.lookup(ign) { skin, error ->
             if (skin == null) {
                 report(event, "set typewriter skin: lookup for \"$ign\" failed - $error")
                 return@lookup
             }
             if (!Authoring.setSkin(definition, skin.texture, skin.signature)) {
-                report(event, "set typewriter skin: no staged entry called \"$definition\"")
+                report(event, "set typewriter skin: could not write to \"$definition\"")
             }
         }
     }
@@ -123,7 +147,7 @@ class EffSetSkin : Effect() {
 
 @Name("Set Typewriter Display Name")
 @Description("Changes the display name on an NPC definition. Publish afterwards.")
-@Examples("set typewriter display name of \"guard\" to \"&cCaptain\"")
+@Examples("set typewriter display name of \"guard\" to \"<red>Captain\"")
 @RequiredPlugins("Typewriter", "Typewriter Entity extension")
 @Since("1.0.5")
 class EffSetDisplayName : Effect() {
@@ -146,8 +170,9 @@ class EffSetDisplayName : Effect() {
     override fun execute(event: Event) {
         val definition = this.definition.getSingle(event) ?: return
         val display = this.display.getSingle(event) ?: return
+        if (!guardIsDefinition(event, "set typewriter display name", definition)) return
         if (!Authoring.setDisplayName(definition, display)) {
-            report(event, "set typewriter display name: no staged entry called \"$definition\"")
+            report(event, "set typewriter display name: could not write to \"$definition\"")
         }
     }
 
